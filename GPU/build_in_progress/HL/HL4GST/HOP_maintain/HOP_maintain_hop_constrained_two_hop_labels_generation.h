@@ -14,20 +14,28 @@ bool HSDL_dynamic_generate_PPR = true;
 
 /*unique code for this file: 599*/
 long long int max_labal_size_599;
+/* the number of labels that during the generation process must not exceed the max_labal_size_599 */
 long long int labal_size_599;
 int max_N_ID_for_mtx_599 = 1e7;
 vector<int> is_mock(max_N_ID_for_mtx_599);
+/* the maximum runtime in nanoseconds is controlled by program parameters */
 double max_run_time_nanoseconds_599;
 int global_upper_k;
 long long int label_size_before_canonical_repair_599, label_size_after_canonical_repair_599;
+/* the time at program startup */
 auto begin_time_599 = std::chrono::high_resolution_clock::now();
 vector<std::shared_timed_mutex> mtx_599(max_N_ID_for_mtx_599);
 graph_v_of_v<int> ideal_graph_599;
 vector<vector<hop_constrained_two_hop_label>> L_temp_599;
+/**
+ * index:[i][j][k]
+ * i: threadId j:dest_vertexId k:labelId
+ */
 vector<vector<vector<pair<int, int>>>> Temp_L_vk_599;
 vector<vector<pair<int, int>>> dist_hop_599, dist_hop_599_v2, dist_hop_599_v3;
 vector<vector<vector<weightTYPE>>> Q_value;
 vector<vector<vector<int>>> Vh_599;
+/* mark the process id in the queue and the id ranges from 0 to threadNum.Because it is ordered, mutual exclusion is necessary*/
 queue<int> Qid_599, Qid_599_v2, Qid_599_v3;
 PPR_type PPR_599;
 
@@ -55,6 +63,7 @@ void initialize_global_values_dynamic_hop_constrained(int N, int thread_num, int
 	}
 }
 
+/* override the operator for hop_constrained_two_hop_label to use the Fibonacci minimum heap */
 bool operator<(hop_constrained_two_hop_label const &x, hop_constrained_two_hop_label const &y)
 {
 	if (x.distance != y.distance)
@@ -66,7 +75,18 @@ bool operator<(hop_constrained_two_hop_label const &x, hop_constrained_two_hop_l
 		return x.hop > y.hop; // < is the max-heap; > is the min heap
 	}
 }
+/**
+ * a minimum fibonacci heap for the hop-constrained 2-hop label
+ */
 typedef typename boost::heap::fibonacci_heap<hop_constrained_two_hop_label>::handle_type hop_constrained_node_handle;
+/**
+ * index[i][j][k];
+ * i: threadNum;
+ * j: vertexId
+ * k: hop
+ * value:label_node,dist
+ * in the BFS iteration process for each vertex,the vector will be reset by changed vector
+ */
 vector<vector<vector<pair<hop_constrained_node_handle, int>>>> Q_handle_priorities_599;
 
 void hop_constrained_clear_global_values()
@@ -81,6 +101,7 @@ void hop_constrained_clear_global_values()
 	PPR_type().swap(PPR_599);
 }
 
+/* use asynchronous tasks to generate L labels and the parameter v_k should be the index of the endpoint */
 void HSDL_thread_function(int v_k)
 {
 	// cout << "HSDL_thread_function" << endl;
@@ -88,27 +109,33 @@ void HSDL_thread_function(int v_k)
 	{
 		throw reach_limit_error_string_MB;
 	}
+	/* exceeding the maximum time limit*/
 	if (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - begin_time_599).count() > max_run_time_nanoseconds_599)
 	{
 		throw reach_limit_error_string_time;
 	}
 
 	/* get unique thread id */
+	/* critical section obtain array index  */
 	mtx_599[max_N_ID_for_mtx_599 - 1].lock();
 	int used_id = Qid_599.front();
 	Qid_599.pop();
 	mtx_599[max_N_ID_for_mtx_599 - 1].unlock();
 
+	/* store the Temp L and dist_hop in current thread*/
 	vector<int> Temp_L_vk_changes, dist_hop_changes;
 	auto &Temp_L_vk = Temp_L_vk_599[used_id];
 	auto &dist_hop = dist_hop_599[used_id]; // record the minimum distance (and the corresponding hop) of a searched vertex in Q
 	vector<pair<int, int>> Q_handle_priorities_changes;
+	/* get the label list in current thread*/
 	auto &Q_handle_priorities = Q_handle_priorities_599[used_id];
 
 	long long int new_label_num = 0;
 
+	/* a class contains information about destination vertex, hop count, and cost in the priority queue */
 	boost::heap::fibonacci_heap<hop_constrained_two_hop_label> Q;
 
+	/* generate a label for the starting vertex itself */
 	hop_constrained_two_hop_label node;
 	node.hub_vertex = v_k;
 	node.hop = 0;
@@ -120,6 +147,7 @@ void HSDL_thread_function(int v_k)
 	mtx_599[v_k].lock();
 	L_temp_599[v_k].push_back(node);
 	new_label_num++;
+	/* Temp_L_vk stores the dest_vertex_id and distance and hop */
 	for (auto &xx : L_temp_599[v_k])
 	{
 		int L_vk_vertex = xx.hub_vertex;
@@ -135,11 +163,14 @@ void HSDL_thread_function(int v_k)
 
 	while (Q.size() > 0)
 	{
-
+		/* poll the vertex from heap.In other words, poll the vertex with the minimal cost */
 		node = Q.top();
 		Q.pop();
+
+		/* current node, u, which is the node generating the labels*/
 		int u = node.hub_vertex;
 
+		/* it doesn't judge nodes with degrees larger than the current node for pruning */
 		if (global_use_rank_prune && v_k > u)
 		{
 			continue;
@@ -193,6 +224,7 @@ void HSDL_thread_function(int v_k)
 		//	cout << "xx: " << P_u << " " << query_v_k_u << endl;
 		// }
 
+		// Either a shorter path to the current label exists, or the node is v_k
 		if (P_u < query_v_k_u || query_v_k_u == 0)
 		{ // query_v_k_u == 0 is to start the while loop by searching neighbors of v_k
 
@@ -229,8 +261,10 @@ void HSDL_thread_function(int v_k)
 			}
 
 			/* update adj */
+			/* Traverse neighboring nodes */
 			for (auto &xx : ideal_graph_599[u])
 			{
+				/* adh_v is the neighborhood and the ec is the distance from u to ajd_v*/
 				int adj_v = xx.first, ec = xx.second;
 
 				if (global_use_2M_prune && P_u + ec >= TwoM_value)
@@ -261,6 +295,7 @@ void HSDL_thread_function(int v_k)
 				{ // adj_v has been reached with a smaller distance and the same hop
 					continue;
 				}
+				/* the vertex has not been visited*/
 				if (dist_hop[adj_v].first == std::numeric_limits<int>::max())
 				{ // adj_v has not been reached
 					yy = {Q.push({node}), node.distance};
@@ -272,7 +307,7 @@ void HSDL_thread_function(int v_k)
 				else
 				{
 					if (node.distance < dist_hop[adj_v].first)
-					{ // adj_v has been reached with a larger distance
+					{ // adj_v has been reached with a less distance
 						if (yy.second != std::numeric_limits<int>::max())
 						{
 							Q.update(yy.first, node);
@@ -287,7 +322,7 @@ void HSDL_thread_function(int v_k)
 						dist_hop[adj_v].second = node.hop;
 					}
 					else if (node.hop < dist_hop[adj_v].second)
-					{ // adj_v has been reached with a larger distance and a larger hop
+					{ // adj_v has been reached with a less hop
 						if (yy.second != std::numeric_limits<int>::max())
 						{
 							Q.update(yy.first, node);
@@ -515,9 +550,10 @@ vector<vector<hop_constrained_two_hop_label>> hop_constrained_sortL(int num_of_t
 	for (int v_k = 0; v_k < N; v_k++)
 	{
 		results.emplace_back(
-			pool.enqueue([&output_L, v_k] { // pass const type value j to thread; [] can be empty
+			pool.enqueue([&output_L, v_k] 
+			{ // pass const type value j to thread; [] can be empty
 				sort(L_temp_599[v_k].begin(), L_temp_599[v_k].end(), compare_hop_constrained_two_hop_label);
-				vector<hop_constrained_two_hop_label>(L_temp_599[v_k]).swap(L_temp_599[v_k]); // swap�ͷ�vector�ж���ռ�
+				vector<hop_constrained_two_hop_label>(L_temp_599[v_k]).swap(L_temp_599[v_k]); // 使用vector的swap优化内存占用，释放多余的空间
 				output_L[v_k] = L_temp_599[v_k];
 				vector<hop_constrained_two_hop_label>().swap(L_temp_599[v_k]); // clear new labels for RAM efficiency
 
@@ -624,14 +660,18 @@ void hop_constrained_two_hop_labels_generation(graph_v_of_v<int> &input_graph, h
 {
 
 	//----------------------------------- step 1: initialization -----------------------------------
+	/* generate containers to store L labels and PPR, and create a thread pool */
 	auto begin = std::chrono::high_resolution_clock::now();
-
+	/*  */
 	labal_size_599 = 0;
 	begin_time_599 = std::chrono::high_resolution_clock::now();
+	/* max run time in nanoseconds. 100*1e9 in this program*/
 	max_run_time_nanoseconds_599 = case_info.max_run_time_seconds * 1e9;
+	// TODO why the max_bit_size is 6e9
 	max_labal_size_599 = case_info.max_bit_size / sizeof(hop_constrained_two_hop_label);
 
 	int N = input_graph.size();
+	/* store the L Label and PPR*/
 	L_temp_599.resize(N);
 	PPR_599.resize(N);
 	if (N > max_N_ID_for_mtx_599)
@@ -652,6 +692,12 @@ void hop_constrained_two_hop_labels_generation(graph_v_of_v<int> &input_graph, h
 	case_info.time_initialization = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count() / 1e9;
 
 	//----------------------------------------------- step 2: generate labels ---------------------------------------------------------------
+	/** 
+	 * Use Temp_L_vk_599 to mark the positional relationship between the iterated nodes 
+	 * and the nodes with already generated labels. This is done to reduce the process of
+	 * traversing the L labels of the iterated nodes. Additionally, register multithreaded
+	 * tasks and retrieve the results 
+	 */ 
 	begin = std::chrono::high_resolution_clock::now();
 
 	global_upper_k = case_info.upper_k == 0 ? std::numeric_limits<int>::max() : case_info.upper_k;
@@ -719,9 +765,14 @@ void hop_constrained_two_hop_labels_generation(graph_v_of_v<int> &input_graph, h
 
 	//----------------------------------------------- step 3: sortL---------------------------------------------------------------
 	begin = std::chrono::high_resolution_clock::now();
-
+	cout << "before sort" << endl;
+	case_info.L = L_temp_599;
+	case_info.print_L();
 	case_info.L = hop_constrained_sortL(num_of_threads);
+	cout << "after sort" << endl;
+	case_info.print_L();	
 	case_info.PPR = PPR_599;
+	case_info.print_PPR();
 
 	end = std::chrono::high_resolution_clock::now();
 	case_info.time_sortL = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count() / 1e9; // s
@@ -729,14 +780,13 @@ void hop_constrained_two_hop_labels_generation(graph_v_of_v<int> &input_graph, h
 	//----------------------------------------------- step 4: canonical_repair---------------------------------------------------------------
 	begin = std::chrono::high_resolution_clock::now();
 
-	// case_info.print_L();
-
 	if (case_info.use_canonical_repair)
 	{
 		hop_constrained_clean_L(case_info, num_of_threads);
+		cout << "after clean" << endl;
+		case_info.print_L();
+		case_info.print_PPR();
 	}
-
-	// case_info.print_L();
 
 	end = std::chrono::high_resolution_clock::now();
 	case_info.time_canonical_repair = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count() / 1e9; // s
