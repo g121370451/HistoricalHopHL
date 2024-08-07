@@ -1,5 +1,5 @@
 #pragma once
-#include <GPU/graph_v_of_v/graph_v_of_v.h>
+#include <CPU/graph_v_of_v/graph_v_of_v.h>
 #include <unordered_map>
 #include <algorithm>
 using namespace std;

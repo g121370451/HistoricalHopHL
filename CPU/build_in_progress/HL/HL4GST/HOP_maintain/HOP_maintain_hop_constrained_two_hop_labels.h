@@ -1,5 +1,5 @@
 #pragma once
-#include <GPU/build_in_progress/HL/HL4GST/HOP_maintain/HOP_PPR.h>
+#include <CPU/build_in_progress/HL/HL4GST/HOP_maintain/HOP_PPR.h>
 
 #define weightTYPE int
 

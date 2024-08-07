@@ -14,7 +14,7 @@ using namespace std;
 #include <boost/random.hpp>
 boost::random::mt19937 boost_random_time_seed{ static_cast<std::uint32_t>(std::time(0)) };
 
-#include <GPU/build_in_progress/HL/HL4GST/HOP_maintain/HOP_maintain_test.h>
+#include <CPU/build_in_progress/HL/HL4GST/HOP_maintain/HOP_maintain_test.h>
 
 
 int main()
@@ -33,18 +33,18 @@ rm A
 
 
 */
-#include <GPU/graph_v_of_v/graph_v_of_v.h>
-#include <GPU/graph_v_of_v/graph_v_of_v_update_vertexIDs_by_degrees_large_to_small.h>
-#include <GPU/graph_v_of_v/graph_v_of_v_generate_random_graph.h>
-#include <GPU/graph_v_of_v/graph_v_of_v_shortest_paths.h>
-#include <GPU/graph_v_of_v/graph_v_of_v_hop_constrained_shortest_distance.h>
-#include <GPU/build_in_progress/HL/HL4GST/HOP_maintain/HOP_maintain_hop_constrained_two_hop_labels_generation.h>
-#include <GPU/build_in_progress/HL/HL4GST/HOP_maintain/HOP_WeightDecreaseMaintenance_improv_batch.h>
-#include <GPU/build_in_progress/HL/HL4GST/HOP_maintain/HOP_WeightIncreaseMaintenance_improv_batch.h>
-#include <GPU/build_in_progress/HL/HL4GST/HOP_maintain/HOP_WeightDecrease2021_batch.h>
-#include <GPU/build_in_progress/HL/HL4GST/HOP_maintain/HOP_WeightIncrease2021_batch.h>
-#include <GPU/text_mining/print_items.h>
-#include <GPU/text_mining/binary_save_read_vector.h>
+#include <CPU/graph_v_of_v/graph_v_of_v.h>
+#include <CPU/graph_v_of_v/graph_v_of_v_update_vertexIDs_by_degrees_large_to_small.h>
+#include <CPU/graph_v_of_v/graph_v_of_v_generate_random_graph.h>
+#include <CPU/graph_v_of_v/graph_v_of_v_shortest_paths.h>
+#include <CPU/graph_v_of_v/graph_v_of_v_hop_constrained_shortest_distance.h>
+#include <CPU/build_in_progress/HL/HL4GST/HOP_maintain/HOP_maintain_hop_constrained_two_hop_labels_generation.h>
+#include <CPU/build_in_progress/HL/HL4GST/HOP_maintain/HOP_WeightDecreaseMaintenance_improv_batch.h>
+#include <CPU/build_in_progress/HL/HL4GST/HOP_maintain/HOP_WeightIncreaseMaintenance_improv_batch.h>
+#include <CPU/build_in_progress/HL/HL4GST/HOP_maintain/HOP_WeightDecrease2021_batch.h>
+#include <CPU/build_in_progress/HL/HL4GST/HOP_maintain/HOP_WeightIncrease2021_batch.h>
+#include <CPU/text_mining/print_items.h>
+#include <CPU/text_mining/binary_save_read_vector.h>
 
 // header files in the Boost library: https://www.boost.org/
 #include <boost/random.hpp>

@@ -153,7 +153,7 @@ inline ThreadPool::~ThreadPool()
 /*Example:
 
 #include <iostream>
-#include <GPU/tool_functions/ThreadPool.h>
+#include <CPU/tool_functions/ThreadPool.h>
 using namespace std;
 
 class example_class
@@ -201,7 +201,7 @@ int main()
 
 
 #include <iostream>
-#include <GPU/tool_functions/ThreadPool.h>
+#include <CPU/tool_functions/ThreadPool.h>
 #include <mutex>
 using namespace std;
 

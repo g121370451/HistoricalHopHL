@@ -1,9 +1,9 @@
 #pragma once
 #include <boost/heap/fibonacci_heap.hpp>
-#include <GPU/build_in_progress/HL/HL4GST/HOP_maintain/HOP_maintain_hop_constrained_two_hop_labels.h>
+#include <CPU/build_in_progress/HL/HL4GST/HOP_maintain/HOP_maintain_hop_constrained_two_hop_labels.h>
 #include <shared_mutex>
-#include <GPU/tool_functions/ThreadPool.h>
-#include <GPU/graph_v_of_v/graph_v_of_v.h>
+#include <CPU/tool_functions/ThreadPool.h>
+#include <CPU/graph_v_of_v/graph_v_of_v.h>
 
 #define MAX_VALUE 1e7
 int TwoM_value = 2 * 1e6; // suppose that dummy edge has a weight of 1e6
@@ -35,7 +35,7 @@ vector<vector<vector<pair<int, int>>>> Temp_L_vk_599;
 vector<vector<pair<int, int>>> dist_hop_599, dist_hop_599_v2, dist_hop_599_v3;
 vector<vector<vector<weightTYPE>>> Q_value;
 vector<vector<vector<int>>> Vh_599;
-/* mark the process id in the queue and the id ranges from 0 to threadNum.Because it is ordered, mutual exclusion is necessary*/
+/* mark the process id in the queue and the id ranges from 0 to threadNum*/
 queue<int> Qid_599, Qid_599_v2, Qid_599_v3;
 PPR_type PPR_599;
 
@@ -577,8 +577,17 @@ void hop_constrained_clean_L(hop_constrained_case_info &case_info, int thread_nu
 
 	ThreadPool pool(thread_num);
 	std::vector<std::future<int>> results;
-
-	for (int v = 0; v < N; v++)
+	/* test the correctness of async */
+	// vector<int> list;
+	// list.push_back(4);
+	// list.push_back(5);
+	// list.push_back(0);
+	// list.push_back(1);
+	// list.push_back(2);
+	// list.push_back(3); 
+	// for (int v = 0; v < N; v++)
+	// for (int index = 0; index < N; index++)
+	for(int v=0;v<N;v++)
 	{
 		results.emplace_back(
 			pool.enqueue([v, &L] { // pass const type value j to thread; [] can be empty
@@ -589,22 +598,37 @@ void hop_constrained_clean_L(hop_constrained_case_info &case_info, int thread_nu
 
 				vector<hop_constrained_two_hop_label> Lv_final;
 
+				/**
+				 * get the L result of the current vertex
+				*/
 				mtx_599[v].lock_shared();
 				vector<hop_constrained_two_hop_label> Lv = L[v];
 				mtx_599[v].unlock_shared();
 				label_size_before_canonical_repair_599 += Lv.size();
 
+				/**
+				 * the temp_L in this thread
+				*/
 				auto &T = Temp_L_vk_599[used_id];
 
+				/**
+				 * Traverse the L-list of the current vertex
+				*/
 				for (auto Lvi : Lv)
 				{
 					int u = Lvi.hub_vertex;
 					int u_hop = Lvi.hop;
 
+					/**
+					 * Traverse the L on the opposite vertex of the current label.
+					*/
 					mtx_599[u].lock_shared();
 					auto Lu = L[u];
 					mtx_599[u].unlock_shared();
 
+					/**
+					 * traverse downward from the perfectly correct first vertex
+					*/
 					int min_dis = std::numeric_limits<int>::max();
 					for (auto &label1 : Lu)
 					{
@@ -765,14 +789,9 @@ void hop_constrained_two_hop_labels_generation(graph_v_of_v<int> &input_graph, h
 
 	//----------------------------------------------- step 3: sortL---------------------------------------------------------------
 	begin = std::chrono::high_resolution_clock::now();
-	cout << "before sort" << endl;
 	case_info.L = L_temp_599;
-	case_info.print_L();
 	case_info.L = hop_constrained_sortL(num_of_threads);
-	cout << "after sort" << endl;
-	case_info.print_L();	
 	case_info.PPR = PPR_599;
-	case_info.print_PPR();
 
 	end = std::chrono::high_resolution_clock::now();
 	case_info.time_sortL = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count() / 1e9; // s
@@ -783,9 +802,6 @@ void hop_constrained_two_hop_labels_generation(graph_v_of_v<int> &input_graph, h
 	if (case_info.use_canonical_repair)
 	{
 		hop_constrained_clean_L(case_info, num_of_threads);
-		cout << "after clean" << endl;
-		case_info.print_L();
-		case_info.print_PPR();
 	}
 
 	end = std::chrono::high_resolution_clock::now();
